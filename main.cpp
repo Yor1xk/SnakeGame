@@ -1,0 +1,417 @@
+
+#include <SDL3/SDL.h>
+
+#include <iostream>
+using namespace std;
+
+
+
+struct SnakeSegment
+{
+    int posX;
+    int posY;
+    int direction;
+    int type; //3 - tail, 2 - head, 1 - body 
+};
+
+
+struct Snake
+{
+    SnakeSegment* segments;
+    int length;
+
+    Snake(int length, int startX, int startY)
+    {
+        //This one should throw when provided with a length < 1
+        this->length = length;
+        segments = new SnakeSegment[length];
+        
+        segments[0] = {startX, startY, -1 ,2}; //SnakeSegment
+    }
+
+
+    void addSegment()
+    {
+
+        SnakeSegment* newsegments = new SnakeSegment[(this->length)+1];
+
+        SnakeSegment lastSegment = this->segments[length-1];
+        for(int i = 0; i < this->length; i++)
+        {
+            newsegments[i] = this->segments[i];
+        }
+
+        newsegments[this->length] = {lastSegment.posX,
+                                     lastSegment.posY,
+                                     -1,
+                                     3};
+        
+        this->length = this->length+1;                                     
+        delete[] this->segments;
+
+        this->segments = newsegments;
+
+  
+    }
+
+  
+
+    void updateField(int*** m, int dimX, int dimY)
+    {
+        SnakeSegment currentSegment;
+        int posX; int posY;
+        for(int i = 0; i < length; i++)
+        {
+            currentSegment = this->segments[i];
+            posX = currentSegment.posX;
+            posY = currentSegment.posY;
+
+            *m[posX][posY] = currentSegment.type;
+
+
+        }
+
+    }
+
+    void move(int dir, int i, int j, int** m, int dimX, int dimY)
+    {
+
+    }
+
+    ~Snake()
+    {
+        delete[] segments;
+    }
+
+    
+};
+
+
+void go(int dir, int i, int j, int** m, int dimX, int dimY)
+{
+    /*
+    0 - UP
+    1 - DOWN
+    2 - LEFT
+    3 - RIGHT
+    */ 
+
+    int newI = i;
+    int newJ = j;
+
+    if(dir == -1)
+    {
+        return;
+    }
+
+    switch(dir)
+    {
+        case 0:
+            if(newI - 1 >= 0) newI--;
+            break;
+        case 1:
+            if(newI + 1 < dimX) newI++;
+            break;
+        case 2:
+            if(newJ - 1 >= 0) newJ--;
+            break;
+        case 3:
+            if(newJ + 1 < dimY) newJ++;
+            break;
+            
+    }
+
+    int oldValue = m[i][j];
+    m[i][j] = 0;
+    m[newI][newJ] = oldValue;
+
+}
+
+
+void allocateMemory(int*** m, int dimX, int dimY)
+{
+    *m = new int* [dimX];
+    for(int i = 0; i < dimX; i++)
+    {
+        (*m)[i] = new int[dimY];
+    }
+
+    //return;
+}
+
+void deallocateMemory(int** m, int dimX)
+{
+    for (int i=0;i<dimX;i++){
+        delete [] m[i];
+    }
+    delete [] m;
+}
+
+
+
+int getSquareCoord(float mouseX, float mouseY, int& squareX, int& squareY, int size, int offset)
+{
+    //Returns 1 when the function succeeded
+    //Returns 0 when the function fails
+    
+    if(&mouseX!= NULL && &mouseY != NULL)
+    {
+        squareX = (int(mouseX)/size);
+        squareY = (int(mouseY)/size);
+        return 1;
+    }
+    return 0;
+    
+
+}
+
+
+void instantiatePlayingField(int*** matrix, int posX, int posY, int dimX, int dimY)
+{
+
+    for(int i = 0; i < dimX; i++)
+    {
+        for(int j = 0; j < dimY; j++)
+        {
+            if(j == posX && i == posY)
+            {
+                (*matrix)[i][j] = 2;
+            }else
+            {
+                (*matrix)[i][j] = 0;
+            }
+        }
+    }
+
+
+
+}
+
+
+int main()
+{
+
+    static SDL_Renderer *renderer = NULL;
+    static SDL_Window *window = NULL;
+
+
+
+    char title[10] = "My Window";
+    bool kill = false;
+
+    int width = 1600;
+    int height = 900;
+
+
+    int squareI = 0;
+    int squareJ = 0;
+    
+
+    int squareSize = 100;
+    int borderSize = 5;
+
+    int dimY = width / squareSize;
+    int dimX = height / squareSize;
+
+    //0 - field
+    //2 - snake head
+    //1 - snake body
+    //3 - snake tail
+    //4 - apple
+    int** playingField;
+    allocateMemory(&playingField, dimX, dimY);
+    
+    int snakeX = 5;
+    int snakeY = 5;
+
+
+    float mouseX;
+    float mouseY;
+
+
+    if (!SDL_Init(SDL_INIT_VIDEO))
+    {
+        SDL_Log("Couldn't initialize SDL: %s", SDL_GetError());
+        return 1;
+    }
+
+    if(!SDL_CreateWindowAndRenderer(title, width, height, SDL_WINDOW_RESIZABLE, &window, &renderer))
+    {
+        SDL_Log("Problem with the creation of window and renderer: %s", SDL_GetError());
+        return 1;
+    }
+    SDL_SetRenderLogicalPresentation(renderer, width, height, SDL_LOGICAL_PRESENTATION_LETTERBOX);
+    
+    instantiatePlayingField(&playingField, snakeX, snakeY, dimX, dimY);
+
+    for(int i = 0; i < dimX; i++)
+    {
+        for(int j = 0; j < dimY; j++)
+        {
+            cout << playingField[i][j] << " ";
+        }
+        cout << endl;
+    }
+    playingField[6][3] = 4;
+   
+    SDL_FRect fieldSquare;
+    
+    Snake snake = {1,snakeX, snakeY};
+
+    uint64_t currentTime = 0;
+    uint64_t lastTime = 0;
+
+    int direction = -1;
+
+    while(!kill)
+    {
+
+        //Clear the previous frame
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);  
+        SDL_RenderClear(renderer);
+
+        currentTime = SDL_GetTicks();
+
+        SDL_Event event;
+
+    
+        while(SDL_PollEvent(&event))
+        {   
+            
+            // poll until all events are handled!
+            if(event.type == SDL_EVENT_KEY_DOWN)
+            {
+                /* the pressed key was Escape? */
+                if(event.key.key == SDLK_ESCAPE)
+                {
+                    kill = true;
+                }
+
+                //Get the direction for the snake
+                if(event.key.key == SDLK_W)
+                {
+                    cout << "Up" << endl;
+                    direction = 0;
+
+                }else if(event.key.key == SDLK_S)
+                {
+                    cout << "Down" << endl;
+                    direction = 1;
+
+                }else if(event.key.key == SDLK_A)
+                {
+                    cout << "Left" << endl;
+                    direction = 2;
+
+                }else if(event.key.key == SDLK_D)
+                {
+                    cout << "Right" << endl;
+                    direction = 3;
+                }
+
+        
+            }
+            if(event.button.type == SDL_EVENT_MOUSE_BUTTON_DOWN)
+            {
+                
+                cout << "Mouse clicked" << endl;
+                SDL_GetMouseState(&mouseX, &mouseY);
+
+                cout << "X: " << mouseX << " " << "Y: " << mouseY << endl;
+
+            }
+ 
+        }
+        SDL_GetMouseState(&mouseX, &mouseY);
+
+
+        if(getSquareCoord(mouseX, mouseY, squareI, squareJ, squareSize, 0) == 1)
+        {
+            //this function calls just gets coordinates of currently selected square
+            //cout << *mouseX << " " << *mouseY << " " << squareI << " " << squareJ << endl;
+        }else
+        {
+            cout << "getSquare failed" << endl;
+        }
+        
+        //Update playing field logic
+        //Based on the key pressed the matrix's next state will be calculated
+        //Then based on the recalculated state the field will be drawn
+        if(currentTime > lastTime + 500)
+        {
+            
+            for(int i = 0;  i < dimX; i++)
+            {
+                for(int j = 0; j < dimY; j++)
+                {
+                    cout << playingField[i][j] << " "; 
+                    if(playingField[i][j] == 2)
+                    {
+                        snakeX = i;
+                        snakeY = j;
+                    }
+                }
+                cout << endl;
+            }
+
+            go(direction, snakeX, snakeY, playingField, dimX, dimY);
+
+        
+    
+
+            lastTime = currentTime;
+        }
+
+
+
+        //Draw the field
+        for(int i = 0; i < dimX; i++)
+        {
+            for(int j = 0; j < dimY; j++)
+            {
+                //Select drawing color
+                if(squareI == j && squareJ == i)
+                {
+                    //Set render color to gray
+                    SDL_SetRenderDrawColor(renderer, 123, 123, 123, 255);
+                }else
+                {
+                    switch(playingField[i][j])
+                    {
+                        case 0:
+                            SDL_SetRenderDrawColor(renderer, 255,255,255,255);
+                            break;
+                        case 1: case 2: case 3:
+                            SDL_SetRenderDrawColor(renderer, 50, 190, 25, 255);
+                            break;
+                        case 4:
+                            SDL_SetRenderDrawColor(renderer, 190, 50, 25, 255);
+                            break;
+                    }
+                }
+                  
+                
+                                
+                //Update the coordinates of the square
+                fieldSquare.x = (j*squareSize) + borderSize;
+                fieldSquare.y = (i*squareSize) + borderSize;
+                fieldSquare.w = (squareSize) - borderSize * 2;
+                fieldSquare.h = (squareSize) - borderSize * 2;
+                
+        
+                SDL_RenderFillRect(renderer, &fieldSquare);
+                
+            }
+
+
+        }
+        SDL_RenderPresent(renderer);
+
+    }
+
+    //deallocateMemory(playingField, dimX);
+ 
+    cout << "I exit here" << endl;
+
+    return 0;
+}
