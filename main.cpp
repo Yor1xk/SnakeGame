@@ -6,6 +6,15 @@ using namespace std;
 
 
 
+
+struct Command
+{
+    int x;
+    int y;
+    int direction;
+};
+
+
 struct SnakeSegment
 {
     int posX;
@@ -19,6 +28,8 @@ struct Snake
 {
     SnakeSegment* segments;
     int length;
+    Command* commands;
+    int command_length = 0;
 
     Snake(int length, int startX, int startY)
     {
@@ -27,6 +38,9 @@ struct Snake
         segments = new SnakeSegment[length];
         
         segments[0] = {startX, startY, -1 ,2}; //SnakeSegment
+
+        
+
     }
 
 
@@ -54,9 +68,7 @@ struct Snake
   
     }
 
-  
-
-    void updateField(int*** m, int dimX, int dimY)
+    void updateField(int** m, int dimX, int dimY)
     {
         SnakeSegment currentSegment;
         int posX; int posY;
@@ -66,21 +78,193 @@ struct Snake
             posX = currentSegment.posX;
             posY = currentSegment.posY;
 
-            *m[posX][posY] = currentSegment.type;
+
+            m[posX][posY] = currentSegment.type;
 
 
         }
 
     }
 
-    void move(int dir, int i, int j, int** m, int dimX, int dimY)
+    void addCommand(int x, int y, int direction)
     {
+        
+        Command* temp = new Command[command_length+1];
+
+        //Copy old values
+        for(int i = 0; i < command_length; i++)
+        {
+            temp[i] = commands[i];
+        }
+        
+        temp[command_length] = {x,y,direction};
+        
+        this->commands = new Command[command_length+1];
+
+        for(int i = 0; i < command_length + 1; i++)
+        {
+            this->commands[i] = temp[i];
+            
+        }
+        cout << "Commands snake" << endl;
+        for(int i = 0; i<command_length; i++)
+        {
+            cout << commands[i].x << ":" << commands[i].y << " " << commands[i].direction << " ";
+        }
+        cout << endl;
+        delete[] temp;
+        this->command_length++;
+
+        
+    }
+
+
+    void setHeadDirection(int dir)
+    {
+        /*
+        0 - UP
+        1 - DOWN
+        2 - LEFT
+        3 - RIGHT
+        */ 
+        SnakeSegment* headPtr = &this->segments[0];
+
+        
+        int currentDir = (*headPtr).direction;
+
+        int currentI = (*headPtr).posX;
+        int currentJ = (*headPtr).posY;
+
+        if(currentDir == dir)
+        {
+            return;
+        }
+        
+        if(this->length == 1)
+        {
+            (*headPtr).direction = dir;
+            this->addCommand(currentI, currentJ, dir);
+            return;
+        }
+        
+
+
+        switch(currentDir)
+        {
+            case 0:
+                if(dir != 1) (*headPtr).direction = dir; 
+                this->addCommand(currentI, currentJ, dir);
+                break;
+            case 1:
+                if(dir != 0) (*headPtr).direction = dir;
+                this->addCommand(currentI, currentJ, dir);
+                break;
+            case 2:
+                if(dir != 3) (*headPtr).direction = dir;
+                this->addCommand(currentI, currentJ, dir);
+                break;
+            case 3:
+                if(dir != 2) (*headPtr).direction = dir;
+                this->addCommand(currentI, currentJ, dir);
+                break;
+            
+            
+        }
+        
+        return;
+        
+    }
+
+    void move(int** matrix, int dimX, int dimY)
+    {
+        SnakeSegment currentSegment;
+
+        //2 - head
+        //1 - body
+        //3 - tail
+
+        int newI, newJ, oldValue;
+        SnakeSegment* segPtr;
+
+        int currentI;
+        int currentJ;
+        for(int i = 0; i < this->length; i++)
+        {
+            currentSegment = segments[i];
+            segPtr = &segments[i];
+            currentI = currentSegment.posX;
+            currentJ = currentSegment.posY;
+
+            //cout << currentSegment.direction << " " << currentSegment.posX << " " << currentSegment.posY << " " << currentSegment.type << endl;
+
+
+            //To decide their direction, body and tail segments will check the commands[] array. The command struct will be removed from the array when it will be traversed
+            // by a tail segment 
+            switch(currentSegment.type)
+            {
+                case 1:
+                    
+                    break;
+                case 2:
+
+                     /*
+                    0 - UP
+                    1 - DOWN
+                    2 - LEFT
+                    3 - RIGHT
+                    */ 
+
+                    newI = currentSegment.posX;
+                    newJ = currentSegment.posY;
+
+                    if(currentSegment.direction == -1)
+                    {
+                        return;
+                    }
+
+                    switch(currentSegment.direction)
+                    {
+                        case 0:
+                            if(newI - 1 >= 0) newI--;
+                            break;
+                        case 1:
+                            if(newI + 1 < dimX) newI++;
+                            break;
+                        case 2:
+                            if(newJ - 1 >= 0) newJ--;
+                            break;
+                        case 3:
+                            if(newJ + 1 < dimY) newJ++;
+                            break;
+                            
+                    }
+
+
+                    oldValue = matrix[currentI][currentJ];
+                    matrix[currentI][currentJ] = 0;
+                    matrix[newI][newJ] = oldValue;
+                    
+                    (*segPtr).posX = newI;
+                    (*segPtr).posY = newJ;
+
+                    break;
+                case 3:
+                    break;
+            }
+
+
+
+
+        }
+        //updateField(matrix, dimX, dimY);
+
 
     }
 
     ~Snake()
     {
         delete[] segments;
+        delete[] commands;
     }
 
     
@@ -290,22 +474,22 @@ int main()
                 //Get the direction for the snake
                 if(event.key.key == SDLK_W)
                 {
-                    cout << "Up" << endl;
+                    //cout << "Up" << endl;
                     direction = 0;
 
                 }else if(event.key.key == SDLK_S)
                 {
-                    cout << "Down" << endl;
+                    //cout << "Down" << endl;
                     direction = 1;
 
                 }else if(event.key.key == SDLK_A)
                 {
-                    cout << "Left" << endl;
+                    //cout << "Left" << endl;
                     direction = 2;
 
                 }else if(event.key.key == SDLK_D)
                 {
-                    cout << "Right" << endl;
+                    //cout << "Right" << endl;
                     direction = 3;
                 }
 
@@ -340,7 +524,8 @@ int main()
         if(currentTime > lastTime + 500)
         {
             
-            for(int i = 0;  i < dimX; i++)
+            
+            /*for(int i = 0;  i < dimX; i++)
             {
                 for(int j = 0; j < dimY; j++)
                 {
@@ -353,8 +538,12 @@ int main()
                 }
                 cout << endl;
             }
+            
+            */
+            snake.setHeadDirection(direction);
+            snake.move(playingField, dimX, dimY);
 
-            go(direction, snakeX, snakeY, playingField, dimX, dimY);
+            
 
         
     
