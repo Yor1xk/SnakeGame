@@ -26,6 +26,7 @@ struct SnakeSegment
 struct Snake
 {
     SnakeSegment* segments;
+    SnakeSegment* trailingSegment;
     int length;
     Command* commands;
     int command_length = 0;
@@ -36,10 +37,21 @@ struct Snake
         this->length = length;
         segments = new SnakeSegment[length];
         
-        segments[0] = {startX, startY, -1 ,2}; //SnakeSegment
 
+        segments[0] = {startX, startY, -1 ,2}; //SnakeSegment
+        trailingSegment = &segments[0];
         
 
+    }
+
+
+    void showSegments()
+    {
+        cout << "Segments from showSegments" << endl;
+            for(int i = 0; i < length; i++)
+            {
+                cout << "POS:{" << segments[i].posX << " , " << segments[i].posY << "} " << segments[i].type << ":" << segments[i].direction << endl;
+            }
     }
 
 
@@ -58,11 +70,16 @@ struct Snake
 
         }
 
-        newsegments[this->length] = {lastSegment.posX,
-                                     lastSegment.posY,
+        cout << (*trailingSegment).posX << " " <<(*trailingSegment).posY << endl;
+
+
+        newsegments[this->length] = {(*trailingSegment).posX,
+                                     (*trailingSegment).posY,
                                      -1,
                                      3};
         
+
+
         //Add logic to check for head segment if length is less than 2 and to update the types accordingly
         if(this->length + 1 > 2)
         {
@@ -181,7 +198,7 @@ struct Snake
             
         }
         
-        if(this->length > 1 ) directionMatrix[currentI][currentJ] = (*headPtr).direction;
+        directionMatrix[currentI][currentJ] = (*headPtr).direction;
 
 
         return;
@@ -193,10 +210,16 @@ struct Snake
         int newI = posX;
         int newJ = posY;
 
+        cout << "getNextCell segment position " << posX << " " << posY << endl;
+        
         if(direction == -1)
         {
+            nextX = posX;
+            nextY = posY;
             return;
         }
+
+        cout << "getNextCell segment position(newIJ before logic) " << newI << " " << newJ << endl;
 
         switch(direction)
         {
@@ -217,9 +240,121 @@ struct Snake
 
         nextX = newI;
         nextY = newJ;
+
+        cout << "Calculated next coordinates " << newI << " " << newJ << endl;
     }
 
 
+    void move2(int** matrix, int dimX, int dimY)
+    {
+
+
+        SnakeSegment currentSegment;
+        SnakeSegment* segPtr;
+
+        int newI,newJ;
+        int currentI,currentJ,oldValue;
+
+        int lastRecordedLength = this->length;
+
+        
+        for(int i = lastRecordedLength-1; i > 0; i--)
+        {
+
+            currentSegment = segments[i];
+            segPtr = &segments[i];
+
+            currentI = currentSegment.posX;
+            currentJ = currentSegment.posY;
+
+            
+            if(i == lastRecordedLength - 1)
+            {
+                (*this->trailingSegment) = {currentI,
+                                            currentJ,
+                                            -1,
+                                            3};
+            }
+
+
+            newI = this->segments[i-1].posX;
+            newJ = this->segments[i-1].posY;
+
+            oldValue = matrix[currentI][currentJ];
+            matrix[currentI][currentJ] = 0;
+            matrix[newI][newJ] = oldValue;
+
+            (*segPtr).posX = newI;
+            (*segPtr).posY = newJ;
+            
+            
+            
+        }
+
+        SnakeSegment head = segments[0];
+        SnakeSegment* headPtr = &segments[0];
+
+
+        int headNewI = head.posX;
+        int headNewJ = head.posY;
+
+
+
+        int currentHeadI = head.posX;
+        int currentHeadJ = head.posY;
+
+        if(head.direction == -1)
+        {
+            return;
+        }
+
+
+
+        switch(head.direction)
+        {
+            case 0:
+                if(headNewI - 1 >= 0) headNewI--;
+                break;
+            case 1:
+                if(headNewI + 1 < dimX) headNewI++;
+                break;
+            case 2:
+                if(headNewJ - 1 >= 0) headNewJ--;
+                break;
+            case 3:
+                if(headNewJ + 1 < dimY) headNewJ++;
+                break;
+                
+        }
+
+        if(matrix[headNewI][headNewJ] == 4)
+        {
+            cout << "I ate apple" << endl;
+            this->addSegment();
+            headPtr = &this->segments[0];
+
+        }
+
+
+        oldValue = matrix[currentHeadI][currentHeadJ];
+        matrix[currentHeadI][currentHeadJ] = 0;
+        matrix[headNewI][headNewJ] = oldValue;
+        
+
+        (*headPtr).posX = headNewI;
+        (*headPtr).posY = headNewJ;
+
+        if(length == 1) trailingSegment = headPtr;
+        
+        cout << (*trailingSegment).posX << " " << (*trailingSegment).posY << endl;
+
+        updateField(matrix, dimX, dimY);
+
+    }
+
+
+
+    //This fucking shit is so shit I dont wanna even look at it
     void move(int** matrix, int** directionMatrix, int dimX, int dimY)
     {
         SnakeSegment currentSegment;
@@ -237,6 +372,7 @@ struct Snake
         int lastRecordedLength = this->length;
         for(int i = 0; i < lastRecordedLength; i++)
         {
+            cout << "Currently viewing " << segments[i].type << " at " << segments[i].posX << " , " << segments[i].posY << " " << segments[i].direction << endl; 
             currentSegment = segments[i];
             segPtr = &segments[i];
             currentI = currentSegment.posX;
@@ -260,7 +396,10 @@ struct Snake
                     currentMatrixDirection = directionMatrix[currentI][currentJ];
                     if(currentMatrixDirection == -1)
                     {
+                        
                         (*segPtr).direction = this->segments[0].direction;
+
+                        
                     }else
                     {
                         (*segPtr).direction = currentMatrixDirection;
@@ -269,9 +408,15 @@ struct Snake
 
                     getNextCell(currentSegment.posX, currentSegment.posY, currentSegment.direction, newI, newJ, dimX, dimY);
                     
+
+                    cout << "Calculated next coordinates " << newI << " " << newJ << endl;
+                  
+
                     (*segPtr).posX = newI;
                     (*segPtr).posY = newJ;
                     
+
+
                     oldValue = matrix[currentI][currentJ];
                     matrix[currentI][currentJ] = 0;
                     matrix[newI][newJ] = oldValue;
@@ -308,6 +453,7 @@ struct Snake
                     {
                         cout << "I ate apple" << endl;
                         this->addSegment();
+                        segPtr = &this->segments[i];
 
                     }
 
@@ -315,8 +461,6 @@ struct Snake
                     matrix[currentI][currentJ] = 0;
                     matrix[newI][newJ] = oldValue;
 
-                    
-                    
                     (*segPtr).posX = newI;
                     (*segPtr).posY = newJ;
 
@@ -324,13 +468,38 @@ struct Snake
                 case 3: //tail
                     
                     currentMatrixDirection = directionMatrix[currentI][currentJ];
+
+                    cout << "CURRENT SEGMENT DIRECTION " << (*segPtr).direction << " <- " << "HEAD DIRECTION " << this->segments[0].direction << endl;
+                    cout << "CURRENT SEGMENT DIRECTION " << (*segPtr).direction << " <- " << "CURRENT MATRIX DIR " << currentMatrixDirection << endl;
+
                     if(currentMatrixDirection == -1)
                     {
+                        
                         (*segPtr).direction = this->segments[0].direction;
+                        currentSegment.direction = this->segments[0].direction;
+
+                        cout << "curMatrixDir is -1" << endl;
+
+                        
                     }else
                     {
                         (*segPtr).direction = currentMatrixDirection;
+                        currentSegment.direction = currentMatrixDirection;
+                        cout << "curMatrixDir is 0,1,2,3" << endl; 
                     }
+
+                    printf("Pointer object:{TYPE:%d, x:%d,y:%d, dir:%d}; CurrentSegment:{TYPE:%d, x:%d,y:%d, dir:%d}\n",
+                    (*segPtr).type,(*segPtr).posX,(*segPtr).posY,(*segPtr).direction,
+                    currentSegment.type,currentSegment.posX,currentSegment.posY,currentSegment.direction);
+
+
+                    cout << "UPDATED SEGMENT DIRECTION " << (*segPtr).direction << " <- " << "HEAD DIRECTION " << this->segments[0].direction << endl;
+                    cout << "UPDATED SEGMENT DIRECTION " << (*segPtr).direction << " <- " << "CURRENT MATRIX DIR " << currentMatrixDirection << endl;
+                    
+                    
+                    cout << "CURRENT I,J" << currentI << ","<<currentJ<< "   " << "CURRENTPOS" << currentSegment.posX << ","<< currentSegment.posY << endl; 
+                    cout << "Current matrix direction " << directionMatrix[currentI][currentJ] << endl;
+                    cout << "current dir + pos" << currentSegment.posX << " " << currentSegment.posY << " ::: " << currentSegment.direction << endl;
 
                     directionMatrix[currentI][currentJ] = -1;
 
@@ -349,12 +518,13 @@ struct Snake
             
 
 
-            cout<<lastRecordedLength << " vs " << this->length << endl;
+            //cout<<lastRecordedLength << " vs " << this->length << endl;
 
 
 
 
         }
+        showSegments();
         updateField(matrix, dimX, dimY);
 
 
@@ -643,7 +813,8 @@ int main()
             
         
             snake.setHeadDirection(direction, directions);
-            snake.move(playingField, directions, dimX, dimY);
+            //snake.move(playingField, directions, dimX, dimY);
+            snake.move2(playingField,dimX,dimY);
 
             cout << "Segments from main()" << endl;
             for(int i = 0; i < snake.length; i++)
@@ -661,18 +832,6 @@ int main()
                 }
                 cout << endl;
             }
-
-            cout << endl << endl;
-            cout << "Directions" << endl;
-            for(int i = 0; i < dimX; i++)
-            {
-                for(int j = 0; j < dimY; j++)
-                {
-                    cout << directions[i][j] << " ";
-                }
-                cout << endl;
-            }
-            
 
 
             lastTime = currentTime;
