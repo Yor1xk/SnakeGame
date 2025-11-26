@@ -1,6 +1,8 @@
 #include <SDL3/SDL.h>
 
 #include <iostream>
+#include <ctime>
+
 using namespace std;
 
 
@@ -28,6 +30,7 @@ struct Snake
     SnakeSegment* segments;
     SnakeSegment* trailingSegment;
     int length;
+    int eatenApples = 0;
     Command* commands;
     int command_length = 0;
 
@@ -245,12 +248,21 @@ struct Snake
     }
 
 
-    void move2(int** matrix, int dimX, int dimY)
+    int move2(int** matrix, int dimX, int dimY)
     {
 
 
         SnakeSegment currentSegment;
         SnakeSegment* segPtr;
+
+        //Move result shows whether this move was valid(as when an apples was eaten, the snake moved to the next position or the win condition was reached)
+        //or invalid(as snake going into itself or out of bound)
+        // 0 - the move was valid
+        // 1 - an apple was eaten
+        // 2 - snake reached its maximum length
+        // -1 - the snake produced an invalid move, ending the game
+        int moveResult = 0;
+
 
         int newI,newJ;
         int currentI,currentJ,oldValue;
@@ -299,13 +311,12 @@ struct Snake
         int headNewJ = head.posY;
 
 
-
         int currentHeadI = head.posX;
         int currentHeadJ = head.posY;
 
         if(head.direction == -1)
         {
-            return;
+            return 0;
         }
 
 
@@ -313,16 +324,40 @@ struct Snake
         switch(head.direction)
         {
             case 0:
-                if(headNewI - 1 >= 0) headNewI--;
+                if(headNewI - 1 >= 0)
+                {
+                    headNewI--;
+                }else
+                {
+                    moveResult = -1;
+                } 
                 break;
             case 1:
-                if(headNewI + 1 < dimX) headNewI++;
+                if(headNewI + 1 < dimX)
+                { 
+                    headNewI++;
+                }else
+                {
+                    moveResult = -1;
+                } 
                 break;
             case 2:
-                if(headNewJ - 1 >= 0) headNewJ--;
+                if(headNewJ - 1 >= 0)
+                {
+                    headNewJ--;
+                }else
+                {
+                    moveResult = -1;
+                } 
                 break;
             case 3:
-                if(headNewJ + 1 < dimY) headNewJ++;
+                if(headNewJ + 1 < dimY)
+                {
+                    headNewJ++;
+                }else
+                {
+                    moveResult = -1;
+                } 
                 break;
                 
         }
@@ -332,9 +367,23 @@ struct Snake
             cout << "I ate apple" << endl;
             this->addSegment();
             headPtr = &this->segments[0];
+            this->eatenApples++;
+
+            if(eatenApples == dimX * dimY)
+            {
+                moveResult = 2;
+            }else
+            {
+                moveResult = 1;
+            }
+
 
         }
 
+        if(matrix[headNewI][headNewJ] == 1 || matrix[headNewI][headNewJ] == 2 || matrix[headNewI][headNewJ] == 3)
+        {
+            moveResult = -1;
+        }
 
         oldValue = matrix[currentHeadI][currentHeadJ];
         matrix[currentHeadI][currentHeadJ] = 0;
@@ -348,7 +397,13 @@ struct Snake
         
         cout << (*trailingSegment).posX << " " << (*trailingSegment).posY << endl;
 
-        updateField(matrix, dimX, dimY);
+        if(moveResult >= 0)
+        {
+            updateField(matrix, dimX, dimY);
+        }
+        return moveResult;
+
+
 
     }
 
@@ -640,9 +695,41 @@ void instantiateMatrix(int*** matrix, int posX, int posY, int specialCell, int n
 
 }
 
+void spawnRandomApples(int*** matrix, int dimX, int dimY, int appleCode, int nOfApples)
+{
+
+    int appleX;
+    int appleY;
+
+    int value;
+    for(int i = 0; i < nOfApples; i++)
+    {
+        appleX = rand() % (dimX);
+        appleY = rand() % (dimY);
+
+
+        value = (*matrix)[appleX][appleY];
+        if(value == 0)
+        {
+            (*matrix)[appleX][appleY] = appleCode;
+        }else
+        {
+            i--;
+        }
+
+    }
+
+
+
+
+}
 
 int main()
 {
+
+
+
+    srand(time({}));
 
     static SDL_Renderer *renderer = NULL;
     static SDL_Window *window = NULL;
@@ -721,9 +808,9 @@ int main()
     }
     
     //Testing purposes; spawns an apple
-    playingField[6][3] = 4;
-    playingField[4][6] = 4;
-    playingField[7][7] = 4;
+    int apples = 5;
+
+    spawnRandomApples(&playingField, dimX, dimY, 4, apples);
    
     SDL_FRect fieldSquare;
     
@@ -733,7 +820,7 @@ int main()
     uint64_t lastTime = 0;
 
     int direction = -1;
-
+    int moveResult;
     while(!kill)
     {
 
@@ -808,22 +895,28 @@ int main()
         //Update playing field logic
         //Based on the key pressed the matrix's next state will be calculated
         //Then based on the recalculated state the field will be drawn
-        if(currentTime > lastTime + 500)
+        if(currentTime > lastTime + 200)
         {
             
         
             snake.setHeadDirection(direction, directions);
             //snake.move(playingField, directions, dimX, dimY);
-            snake.move2(playingField,dimX,dimY);
+            moveResult = snake.move2(playingField,dimX,dimY);
 
-            cout << "Segments from main()" << endl;
-            for(int i = 0; i < snake.length; i++)
+            switch(moveResult)
             {
-                cout << "POS:{" << snake.segments[i].posX << " , " << snake.segments[i].posY << "} " << snake.segments[i].type << ":" << snake.segments[i].direction << endl;
+                case -1:
+                    cout << "You lost the game" << endl;
+                    break;
+                case 1:
+                    spawnRandomApples(&playingField,dimX,dimY,4,1);
+                    break;
+                case 2:
+                    cout << "You won the game" << endl;
+                    break;
             }
-
             
-            cout << "Matrix" << endl;
+            /*cout << "Matrix" << endl;
             for(int i = 0; i < dimX; i++)
             {
                 for(int j = 0; j < dimY; j++)
@@ -832,7 +925,7 @@ int main()
                 }
                 cout << endl;
             }
-
+            */
 
             lastTime = currentTime;
         }
